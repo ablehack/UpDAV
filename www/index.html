@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="favicon.svg" type="image/x-icon" />
+    <title>工厂界面</title>
+    <script src="jquery.min.js"></script>
+    <link rel="stylesheet" href="bootstrap.min.css" />
+    <link rel="stylesheet" href="bootstrap.plugin.css" />
+    <style>
+        * {
+            --bs-card-inner-border-radius: 0.8rem !important;
+            --bs-card-border-radius: 0.8rem !important;
+            --bs-btn-border-radius: 0.7rem !important;
+        }
+
+        .upload-area {
+            min-height: 10rem;
+            padding-top: 3rem;
+            text-align: center;
+            border: 2px dashed #ccc;
+            border-radius: 0.5rem;
+        }
+
+        .upload-area.hover {
+            border-color: #0d6efd;
+        }
+
+        .fr-1 {
+            align-items: center;
+        }
+    </style>
+</head>
+
+<body data-bs-theme="dark">
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">固件升级</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- 拖拽上传区域 -->
+                        <div id="uploadArea" class="upload-area">
+                            <p class="mb-0">拖拽或点击选择固件</p>
+                        </div>
+                        <!-- 文件选择表单 -->
+                        <form id="uploadForm" enctype="multipart/form-data" class="d-none">
+                            <input type="file" name="file" id="file" required />
+                        </form>
+                        <!-- 上传进度条 -->
+                        <div id="progressBar" class="progress mt-3 d-none">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <!-- 上传结果提示 -->
+                        <div id="response" class="mt-3"></div>
+                    </div>
+                    <div class="card-footer fr-1 d-flex justify-content-between">
+                        <span>注意：固件升级前请先备份好数据</span>
+                        <button class="btn btn-primary" id="upgradeBtn" disabled>升级固件</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row justify-content-center mt-3">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">调试功能</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- WebDAV开关 -->
+                        <div class="d-flex justify-content-between">
+                            <span>WebDAV功能</span>
+                            <input class="ios-switch fr-1" type="checkbox" id="webDavSwitch">
+                        </div>
+                        <!-- WebDAV使用提示 -->
+                        <div id="response2" class="mt-3"></div>
+                    </div>
+                    <div class="card-footer fr-1 d-flex justify-content-between">
+                        <span></span>
+                        <button class="btn btn-primary" id="mountBtn" disabled>获取挂载脚本</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    $(document).ready(function () {
+        const uploadArea = $("#uploadArea");
+        const fileInput = $("#file");
+        const progressBar = $("#progressBar");
+        const progressBarInner = $(".progress-bar");
+        const responseDiv = $("#response");
+        const startUpgrade = $("#upgradeBtn");
+
+        // 点击拖拽区域触发文件选择
+        uploadArea.on("click", function () {
+            fileInput.trigger("click");
+        });
+
+        // 拖拽文件进入区域
+        uploadArea.on("dragover", function (e) {
+            e.preventDefault();
+            uploadArea.addClass("hover");
+            uploadArea.addClass("dragover");
+        });
+
+        // 拖拽文件离开区域
+        uploadArea.on("dragleave", function (e) {
+            e.preventDefault();
+            uploadArea.removeClass("hover");
+            uploadArea.removeClass("dragover");
+        });
+
+        // 拖拽文件释放
+        uploadArea.on("drop", function (e) {
+            e.preventDefault();
+            uploadArea.removeClass("hover");
+            uploadArea.removeClass("dragover");
+            const files = e.originalEvent.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput[0].files = files;
+                uploadFile();
+            }
+        });
+
+        // 文件选择后触发上传
+        fileInput.on("change", function () {
+            if (fileInput[0].files.length > 0) {
+                uploadFile();
+            }
+        });
+
+        // 点击升级按钮触发上传
+        startUpgrade.on("click", function () {
+            fetch('/upgrade')
+               .then(res => res.json())
+               .then(data => {
+                    console.log(data);
+                })
+        });
+
+
+        // 上传文件函数
+        function uploadFile() {
+            const file = fileInput[0].files[0];
+            if (!file) {
+                alert("请选择一个文件");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            // 显示进度条
+            progressBar.removeClass("d-none");
+            progressBarInner.css("width", "0%");
+
+            // 使用 XMLHttpRequest 进行流式上传
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "/upload", true);
+
+            // 上传进度事件
+            xhr.upload.onprogress = function (event) {
+                if (event.lengthComputable) {
+                    const percent = (event.loaded / event.total) * 100;
+                    progressBarInner.css("width", percent + "%");
+                }
+            };
+
+            // 上传完成事件
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    responseDiv.html(`
+                            <div class="alert alert-success">
+                                文件上传成功: ${response.filePath}
+                            </div>
+                        `);
+                } else {
+                    const response = JSON.parse(xhr.responseText);
+                    responseDiv.html(`
+                            <div class="alert alert-danger">
+                                文件上传失败: ${response.error}
+                            </div>
+                        `);
+                }
+                progressBar.addClass("d-none");
+                startUpgrade.prop("disabled", false);
+            };
+
+            // 上传错误事件
+            xhr.onerror = function () {
+                responseDiv.html(`
+                        <div class="alert alert-danger">
+                            文件上传失败: 网络错误
+                        </div>
+                    `);
+                progressBar.addClass("d-none");
+            };
+
+            // 发送请求
+            xhr.send(formData);
+        }
+    });
+</script>
+<script>
+    $(document).ready(function () {
+        const webDavSwitch = $("#webDavSwitch");
+        const mountBtn = $("#mountBtn");
+        const responseDiv = $("#response2");
+
+        fetch('/webdav?cmd=status')
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'enabled') {
+                    webDavSwitch.prop('checked', true);
+                    mountBtn.prop('disabled', false);
+                    responseDiv.html(`
+                            <div class="alert alert-success">
+                                WebDAV已启用,获取挂载脚本或使用cmd输入以下命令:<br>
+                                net use X: http://${document.location.hostname}:8848/ & code X:
+                            </div>
+                        `);
+                } else {
+                    webDavSwitch.prop('checked', false);
+                    mountBtn.prop('disabled', true);
+                    responseDiv.html(``);
+                }
+            })
+
+        webDavSwitch.on('change', function () {
+            const checked = webDavSwitch.prop('checked');
+            if (checked) {
+                fetch('/webdav?cmd=enable');
+                mountBtn.prop('disabled', false);
+                responseDiv.html(`
+                            <div class="alert alert-success">
+                                WebDAV已启用,获取挂载脚本或使用cmd输入以下命令:<br>
+                                net use X: http://${document.location.hostname}:8848/ & code X:
+                            </div>
+                        `);
+            } else {
+                fetch('/webdav?cmd=disable');
+                mountBtn.prop('disabled', true);
+                responseDiv.html(``);
+            }
+        });
+
+        mountBtn.on('click', function () {
+            // 定义 BAT 文件内容
+            const batContent = `net use X: http://${document.location.hostname}:8848/ & code X:`;
+            // 创建 Blob 对象
+            const blob = new Blob([batContent], { type: 'text/plain;charset=utf-8' });
+            // 创建下载链接并触发下载
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'load.bat';  // 设置下载文件名
+            document.body.appendChild(a);
+            a.click();  // 模拟点击下载
+            document.body.removeChild(a);  // 清理 DOM
+            URL.revokeObjectURL(url);  // 释放 Blob URL
+        })
+    });
+</script>
+
+</html>

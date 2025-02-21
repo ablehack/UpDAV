@@ -1,0 +1,39 @@
+* {
+    --switch-width: 64px;
+    --switch-height: 32px;
+    --switch-point: 24px;
+    --switch-border-radius: calc(var(--switch-height) / 2);
+}
+
+.ios-switch {
+	appearance: none;
+	width: var(--switch-width);
+	height: var(--switch-height);
+	position: relative;
+	border-radius: var(--switch-border-radius);
+	cursor: pointer;
+	background-color: #777;
+}
+/* 开关里的小圆点 */
+.ios-switch:before {
+	content: "";
+	position: absolute;
+	width: 26px;
+	height: 26px;
+	background: white;
+	top: 3px;
+	left: 3px;
+	border-radius: 50%;
+    box-shadow: 0px 0px 3px 0px #4d4d4d;
+    transition: linear 0.1s;
+}
+.ios-switch:checked {
+	background-color: limegreen !important;
+}
+.ios-switch:checked:before {
+	left: 34px;
+}
+.ios-switch:checked:after {
+	color: black;
+}
+
