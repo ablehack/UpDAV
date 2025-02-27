@@ -9,10 +9,14 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 
+	"github.com/creack/pty"
 	"github.com/gin-gonic/gin"
+	"github.com/olahol/melody"
 	"golang.org/x/net/webdav"
 )
 
@@ -35,15 +39,54 @@ var (
 	mu           sync.Mutex
 )
 
+var (
+	c   *exec.Cmd
+	f   interface{}
+	err error
+)
+
 func init() {
 }
 
 func main() {
-	gin.SetMode(gin.ReleaseMode)
+	// c = exec.Command("cmd")
+	// f, err = conpty.Start(c.Path)
+	c = exec.Command("/bin/sh")
+	f, err = pty.Start(c)
+	if err != nil {
+		panic(err)
+	}
+
+	m := melody.New()
+
+	go func() {
+		for {
+			buf := make([]byte, 1024)
+			var read int
+			// 使用ConPTY的读取方法
+			// read, err = f.(*conpty.ConPty).Read(buf)
+			read, err = f.(*os.File).Read(buf)
+			if err != nil {
+				break
+			}
+			m.Broadcast(buf[:read])
+		}
+	}()
+
+	m.HandleMessage(func(s *melody.Session, msg []byte) {
+		// 使用ConPTY的写入方法
+		// f.(*conpty.ConPty).Write(msg)
+		// 使用pty的写入方法
+		f.(*os.File).Write(msg)
+	})
+	// gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.POST("/upload", PostApiUpload) // 处理上传文件的路由
 	r.GET("/webdav", getWebdav)      // 开启webdav服务
 	r.GET("/upgrade", getUpgrade)    // 处理升级
+	r.GET("/ws", func(c *gin.Context) {
+		m.HandleRequest(c.Writer, c.Request)
+	})
 	// r.NoRoute(httpWeb)
 	staticFp, _ := fs.Sub(webDir, wwwroot)
 	r.NoRoute(gin.WrapH(http.FileServer(http.FS(staticFp))))
@@ -162,6 +205,25 @@ func startWebDAV() {
 }
 
 func getUpgrade(c *gin.Context) {
+	if runtime.GOOS == "windows" {
+		cmd := exec.Command("cmd", "/c", "start", "upgrade.bat")
+		err := cmd.Run()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"msg": "升级失败",
+			})
+			return
+		}
+	} else {
+		cmd := exec.Command("sh", "upgrade.sh")
+		err := cmd.Run()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"msg": "升级失败",
+			})
+			return
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"msg": "升级成功",
 	})

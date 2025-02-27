@@ -31,13 +31,45 @@
         .fr-1 {
             align-items: center;
         }
+        #webssh {
+            position: fixed;
+            bottom: 0;
+            width: 100vw;
+            height: 50vh;
+            border-top: solid 2px #0d6efd;
+            /* transition: height 0.3s ease; 添加过渡动画 */
+        }
+        /* 把手样式 */
+        .resize-handle {
+            position: fixed;
+            bottom: 50vh; /* 初始位置与 iframe 高度一致 */
+            left: 30vw;
+            width: 40vw;
+            cursor: pointer; /* 显示点击光标 */
+            z-index: 1000; /* 确保把手在最上层 */
+            text-align: center;
+            line-height: 10px;
+            font-size: 12px;
+            color: #ffffff;
+        }
+        .resize-handle > h4 {
+            margin: 0 !important;
+        }
+
+        /* 容器样式 */
+        .iframe-container {
+            position: fixed;
+            bottom: 0;
+            width: 100vw;
+            overflow: hidden;
+        }
     </style>
 </head>
 
 <body data-bs-theme="dark">
     <div class="container mt-5">
         <div class="row justify-content-center">
-            <div class="col-md-8">
+            <div class="col-md-8 mb-3">
                 <div class="card shadow">
                     <div class="card-header bg-primary text-white">
                         <h5 class="card-title mb-0">固件升级</h5>
@@ -64,9 +96,7 @@
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="row justify-content-center mt-3">
-            <div class="col-md-8">
+            <div class="col-md-4 mb-3">
                 <div class="card shadow">
                     <div class="card-header bg-primary text-white">
                         <h5 class="card-title mb-0">调试功能</h5>
@@ -79,6 +109,11 @@
                         </div>
                         <!-- WebDAV使用提示 -->
                         <div id="response2" class="mt-3"></div>
+                        <!-- WebSSH控制台 -->
+                        <!-- <div class="d-flex justify-content-between">
+                            <span>WebSSH功能</span>
+                            <input class="ios-switch fr-1" type="checkbox" id="webSSHSwitch">
+                        </div> -->
                     </div>
                     <div class="card-footer fr-1 d-flex justify-content-between">
                         <span></span>
@@ -88,7 +123,12 @@
             </div>
         </div>
     </div>
+    <div class="iframe-container">
+        <div class="card-header bg-primary text-white resize-handle" id="resizeHandle"><h4>☰</h4></div>
+        <iframe id="webssh"></iframe>
+    </div>
 </body>
+<!-- 上传固件和调用脚本功能块 -->
 <script>
     $(document).ready(function () {
         const uploadArea = $("#uploadArea");
@@ -138,10 +178,12 @@
 
         // 点击升级按钮触发上传
         startUpgrade.on("click", function () {
+            alert('开始升级，请耐心等待！');
             fetch('/upgrade')
                .then(res => res.json())
                .then(data => {
                     console.log(data);
+                    alert('升级结束，请刷新！');
                 })
         });
 
@@ -209,6 +251,7 @@
         }
     });
 </script>
+<!-- WebDAV功能块 -->
 <script>
     $(document).ready(function () {
         const webDavSwitch = $("#webDavSwitch");
@@ -270,4 +313,58 @@
     });
 </script>
 
+<script>
+    $(document).ready(function () {
+        const webssh = $("#webssh");
+        webssh.attr("src", "/websh");
+        const webSSHSwitch = $("#webSSHSwitch");
+        webSSHSwitch.on('change', function () {
+            const checked = webSSHSwitch.prop('checked');
+            if (checked) {
+                const websshUrl = "/websh";
+                webssh.attr("src", websshUrl);
+                webssh.show();
+            } else {
+                webssh.hide();
+            }
+        });
+
+        
+        // 获取把手和 iframe 元素
+        const resizeHandle = $('#resizeHandle')
+        const iframe = document.getElementById('webssh');
+        // 标记 iframe 是否展开
+        let isExpanded = true;
+        // 监听把手的点击事件
+        resizeHandle.click(function () {
+            if (isExpanded) { // 收起 iframe
+                iframe.style.height = '0';
+                this.style.bottom = '0';
+            } else { // 展开 iframe
+                iframe.style.height = '50vh';
+                this.style.bottom = '50vh';
+            }
+            isExpanded = !isExpanded; // 切换状态
+        });
+
+
+        let isMove = false;
+        // 监听鼠标拖动事件
+        resizeHandle.on('mousedown', function (e) {
+            // console.log('按下');
+            isMove = true;
+        });
+
+        resizeHandle.on('mouseup', function (e) {
+            // console.log('抬起');
+            isMove = false;
+        });
+
+        resizeHandle.on('mousemove', function (e) {
+            if (isMove) {
+                // console.log('点击移动');
+            }
+        });
+    });
+</script>
 </html>
